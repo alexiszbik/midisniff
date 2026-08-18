@@ -19,6 +19,7 @@ FetchContent_MakeAvailable(rtmidi)
 
 add_executable(midisniff
     src/main.cpp
+    src/CommandConsole.cpp
     src/Logger.cpp
     src/MidiFilter.cpp
     src/MidiMessageFormatter.cpp

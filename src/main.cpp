@@ -1,3 +1,4 @@
+#include "CommandConsole.h"
 #include "Logger.h"
 #include "MidiFilter.h"
 #include "MidiMessageFormatter.h"
@@ -86,11 +87,15 @@ int main()
 
         Logger::info("");
         Logger::info("Logging MIDI from: " + midiIn.getPortName(static_cast<unsigned int>(selectedPort)));
-        Logger::info("Press Enter to stop.");
+        Logger::info("Type commands below. Use 'help' for options, 'quit' to stop.");
         Logger::info("");
 
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cin.get();
+
+        CommandConsole console(filter);
+        console.printHelp();
+        console.start();
+        console.join();
     }
     catch (const RtMidiError& error)
     {

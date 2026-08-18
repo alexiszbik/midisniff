@@ -11,15 +11,18 @@ namespace
 }
 
 MidiFilter::MidiFilter()
+    : soloChannel_(0)
 {
-    for (std::size_t i = 0; i < toIndex(MidiMessageType::Count); ++i) {
+    for (std::size_t i = 0; i < toIndex(MidiMessageType::Count); ++i)
         enabled_[i] = false;
-    }
 
     enabled_[toIndex(MidiMessageType::NoteOff)]       = true;
     enabled_[toIndex(MidiMessageType::NoteOn)]        = true;
     enabled_[toIndex(MidiMessageType::ProgramChange)] = true;
     enabled_[toIndex(MidiMessageType::ControlChange)] = true;
+
+    for (std::size_t i = 0; i < midi::kChannelCount; ++i)
+        channels_[i] = true;
 }
 
 MidiMessageType MidiFilter::classify(const std::vector<unsigned char>& message)
@@ -72,13 +75,30 @@ MidiMessageType MidiFilter::classify(const std::vector<unsigned char>& message)
     }
 }
 
+int MidiFilter::extractChannelIndex(const std::vector<unsigned char>& message)
+{
+    if (message.empty() || message[0] >= midi::kSystemStatusMin)
+        return -1;
+
+    return static_cast<int>(message[0] & midi::kChannelMask);
+}
+
 bool MidiFilter::shouldLog(const std::vector<unsigned char>& message) const
 {
+    const std::lock_guard<std::mutex> lock(mutex_);
+
     const MidiMessageType type = classify(message);
     if (type == MidiMessageType::Unknown || type == MidiMessageType::Count)
         return false;
 
-    return enabled_[toIndex(type)];
+    if (!enabled_[toIndex(type)])
+        return false;
+
+    const int channelIndex = extractChannelIndex(message);
+    if (channelIndex < 0)
+        return true;
+
+    return isChannelAllowed(channelIndex);
 }
 
 void MidiFilter::setEnabled(MidiMessageType type, bool enabled)
@@ -86,6 +106,7 @@ void MidiFilter::setEnabled(MidiMessageType type, bool enabled)
     if (type == MidiMessageType::Unknown || type == MidiMessageType::Count)
         return;
 
+    const std::lock_guard<std::mutex> lock(mutex_);
     enabled_[toIndex(type)] = enabled;
 }
 
@@ -94,5 +115,83 @@ bool MidiFilter::isEnabled(MidiMessageType type) const
     if (type == MidiMessageType::Unknown || type == MidiMessageType::Count)
         return false;
 
+    const std::lock_guard<std::mutex> lock(mutex_);
     return enabled_[toIndex(type)];
+}
+
+bool MidiFilter::isValidChannel(int channel)
+{
+    return channel >= 1 && channel <= midi::kChannelCount;
+}
+
+std::size_t MidiFilter::channelIndex(int channel)
+{
+    return static_cast<std::size_t>(channel - 1);
+}
+
+void MidiFilter::setChannelEnabled(int channel, bool enabled)
+{
+    if (!isValidChannel(channel))
+        return;
+
+    const std::lock_guard<std::mutex> lock(mutex_);
+    channels_[channelIndex(channel)] = enabled;
+}
+
+bool MidiFilter::isChannelEnabled(int channel) const
+{
+    if (!isValidChannel(channel))
+        return false;
+
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return channels_[channelIndex(channel)];
+}
+
+void MidiFilter::enableAllChannels()
+{
+    const std::lock_guard<std::mutex> lock(mutex_);
+    for (std::size_t i = 0; i < midi::kChannelCount; ++i)
+        channels_[i] = true;
+}
+
+void MidiFilter::disableAllChannels()
+{
+    const std::lock_guard<std::mutex> lock(mutex_);
+    for (std::size_t i = 0; i < midi::kChannelCount; ++i)
+        channels_[i] = false;
+}
+
+void MidiFilter::setSoloChannel(int channel)
+{
+    if (!isValidChannel(channel))
+        return;
+
+    const std::lock_guard<std::mutex> lock(mutex_);
+    soloChannel_ = channel;
+}
+
+void MidiFilter::clearSolo()
+{
+    const std::lock_guard<std::mutex> lock(mutex_);
+    soloChannel_ = 0;
+}
+
+bool MidiFilter::hasSolo() const
+{
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return soloChannel_ > 0;
+}
+
+int MidiFilter::soloChannel() const
+{
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return soloChannel_;
+}
+
+bool MidiFilter::isChannelAllowed(int channelIndex) const
+{
+    if (soloChannel_ > 0)
+        return channelIndex == soloChannel_ - 1;
+
+    return channels_[static_cast<std::size_t>(channelIndex)];
 }
