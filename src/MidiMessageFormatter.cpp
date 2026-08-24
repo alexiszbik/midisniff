@@ -37,7 +37,7 @@ std::string MidiMessageFormatter::formatRawBytes(const std::vector<unsigned char
 
 std::string MidiMessageFormatter::noteName(unsigned char note)
 {
-    const int octave = static_cast<int>(note) / midi::kNotesPerOctave - 1;
+    const int octave = static_cast<int>(note) / midi::kNotesPerOctave - midi::kDisplayOctaveOffset;
     return std::string(kNoteNames[note % midi::kNotesPerOctave]) + std::to_string(octave);
 }
 

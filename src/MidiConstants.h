@@ -9,7 +9,8 @@ namespace midi
     constexpr std::uint8_t kSystemStatusMin  = 0xF0;
 
     constexpr std::uint8_t kChannelCount       = 16;
-    constexpr std::uint8_t kNotesPerOctave   = 12;
+    constexpr std::uint8_t kNotesPerOctave        = 12;
+    constexpr int          kDisplayOctaveOffset   = 2;
     constexpr std::uint8_t kVelocityOff      = 0;
     constexpr std::uint8_t kPitchBendLsbBits = 7;
 
